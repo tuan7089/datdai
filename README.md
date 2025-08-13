@@ -1,3 +1,27 @@
+📦src
+ ┣ 📂assets
+ ┃ ┗ 📜svelte.svg
+ ┣ 📂components
+ ┃ ┣ 📜Modal.svelte
+ ┃ ┗ 📜Nav.svelte
+ ┣ 📂lib
+ ┃ ┣ 📜firebase.ts
+ ┃ ┣ 📜localcache.ts
+ ┃ ┣ 📜router.ts
+ ┃ ┣ 📜sheet.ts
+ ┃ ┗ 📜util.ts
+ ┣ 📂routes
+ ┃ ┣ 📜CaiDat.svelte
+ ┃ ┣ 📜DatList.svelte
+ ┃ ┗ 📜KhachList.svelte
+ ┣ 📂types
+ ┃ ┗ 📜index.ts
+ ┣ 📜app.css
+ ┣ 📜App.svelte
+ ┣ 📜main.ts
+ ┣ 📜stores.ts
+ ┗ 📜vite-env.d.ts 
+
 # Svelte + TS + Vite
 
 This template should help get you started developing with Svelte and TypeScript in Vite.
