@@ -22,6 +22,55 @@
  ┣ 📜stores.ts
  ┗ 📜vite-env.d.ts 
 
+import Filter from "./Filter.svelte";
+function handleFilterChange(e: CustomEvent<LoDat[]>) {
+    ketQua = e.detail;
+  }
+  
+<Filter {danhSach} data={danhSach} on:change={handleFilterChange} />
+{#each ketQua as lo}
+ Khi viết như vây tôi thấy luồng dữ liệu xử lý trở nên phức tạp vậy khi build ra thì có làm giảm hiệu năng không hay viết filter trong app luôn thì tốc độ có nhanh hơn không
+
+
+ChatGPT đã nói:
+Mình hiểu lo lắng của bạn — nhìn qua thì đúng là khi tách riêng thành component Filter với dispatch("change", …) rồi App mới nhận lại dữ liệu thì luồng dữ liệu có vẻ vòng vèo hơn, nhưng thực tế về hiệu năng thì:
+
+1. Về tốc độ khi build & runtime
+Build time: Việc bạn viết filter trong App hay tách ra component không ảnh hưởng đáng kể tới tốc độ build. Svelte khi compile sẽ inline toàn bộ logic của component con vào JS đầu ra, không tạo overhead kiểu React virtual DOM phức tạp.
+
+Runtime:
+
+Trong cách mình viết, $: reactivity của Svelte sẽ chỉ chạy khi biến liên quan thay đổi (searchTerm, selectedKhuVuc, selectedLoaiDat, hoặc data).
+
+dispatch chỉ gửi một tham chiếu mảng (hoặc bản copy nếu filter trả mảng mới), nên chi phí rất nhỏ.
+
+So với việc viết filter thẳng trong App, sự khác biệt về tốc độ gần như không đáng kể nếu số lượng item ở mức bình thường (vài trăm – vài nghìn).
+
+2. Khi nào viết filter trong App sẽ nhanh hơn?
+Nếu danh sách đất rất lớn (hàng trăm nghìn – hàng triệu bản ghi) và filter chạy liên tục khi nhập từng ký tự, việc tách thành component rồi trả mảng mới qua sự kiện sẽ có thêm một bước tạo mảng, có thể tiêu tốn bộ nhớ.
+
+Lúc đó, tối ưu hơn là:
+
+Filter trực tiếp tại App (tránh dispatch qua lại)
+
+Hoặc debounce (chờ 200–300ms sau khi người dùng ngừng gõ mới lọc)
+
+Hoặc filter trên server (nếu dữ liệu cực lớn)
+
+3. Lợi ích của việc tách Filter thành component
+Tái sử dụng: Bạn có thể dùng Filter này cho nhiều trang hoặc nhiều loại danh sách mà chỉ cần truyền data khác nhau.
+
+Tách biệt logic UI & data: App chỉ cần lắng nghe kết quả, không cần quan tâm các input UI bên trong Filter.
+
+Dễ bảo trì: Thay đổi giao diện hoặc logic filter không ảnh hưởng trực tiếp App chính.
+
+4. Kết luận
+Nếu số lượng bản ghi không quá lớn (dưới vài chục nghìn), bạn không cần lo về hiệu năng — Svelte xử lý rất nhẹ.
+
+Việc tách component chủ yếu là vì cấu trúc code gọn gàng và dễ mở rộng chứ không ảnh hưởng nhiều tới tốc độ.
+
+Nếu dataset cực lớn → nên filter ở App hoặc thậm chí ở server.
+
 # Svelte + TS + Vite
 
 This template should help get you started developing with Svelte and TypeScript in Vite.
