@@ -1,15 +1,94 @@
 <script lang="ts">
+  let isDownloading = false;
+
+  // Hàm download 1 ảnh với XMLHttpRequest
+  function downloadImage(url, filename) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const blob = xhr.response;
+          const downloadUrl = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = downloadUrl;
+          a.download = filename;
+          a.click();
+
+          URL.revokeObjectURL(downloadUrl);
+          resolve();
+        } else {
+          reject(new Error(`HTTP ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.open("GET", url);
+      xhr.responseType = "blob";
+      xhr.send();
+    });
+  }
+
+  // Hàm download tất cả ảnh
+  async function downloadAll(str) {
+    if (isDownloading) return;
+
+    isDownloading = true;
+    // tách chuỗi theo cả dấu phẩy , và xuống dòng \n
+    const arr = str
+      .split(/,|\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    for (let i = 0; i < arr.length; i++) {
+      const url = arr[i];
+      const filename = `image-${Math.floor(Math.random() * 100000)}.jpg`;
+
+      try {
+        await downloadImage(url, filename);
+        await new Promise((resolve) => setTimeout(resolve, 50)); // Delay nhỏ
+      } catch (error) {
+        console.error(`Failed to download ${filename}:`, error);
+      }
+    }
+
+    isDownloading = false;
+    alert("Download hoàn thành!");
+  }
+
   import { onMount } from "svelte";
   import LandFilter from "../components/LandFilter.svelte";
   import { db } from "../lib/firebase";
   import {
     ref,
+    get,
+    set,
     onValue,
     increment,
     runTransaction,
     update,
   } from "firebase/database";
   import { writable } from "svelte/store";
+
+  async function checkNewDay(): Promise<boolean> {
+    const today = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
+    const dateRef = ref(db, "lastCheckDate");
+
+    const snapshot = await get(dateRef);
+    const lastDate = snapshot.exists() ? snapshot.val() : null;
+
+    if (lastDate !== today) {
+      // Cập nhật ngày mới
+      resetCopyCountFromDanhsach();
+
+      alert("Chào ngày mới");
+      await set(dateRef, today);
+      return true; // có ngày mới
+    }
+
+    return false; // chưa sang ngày mới
+  }
 
   // ////// ////   // // ////////////////// / ///
   //        ĐẾM SỐ LẦN COPY   + REALTIME COPY  //
@@ -42,7 +121,7 @@
 
     try {
       await update(ref(db), updates);
-      alert("Đã reset copyCount cho tất cả item trong danhsach");
+      // alert("Đã reset copyCount cho tất cả item trong danhsach");
     } catch (error) {
       alert("Lỗi khi reset copyCount:");
     }
@@ -57,19 +136,8 @@
   }
 
   onMount(() => {
+    checkNewDay();
     subscribeCopyCounts(); // PHẢI gọi hàm này
-
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10); // yyyy-mm-dd
-    const lastShown = localStorage.getItem("lastGreetingDate");
-
-    if (lastShown !== today) {
-      // chỉ chào 1 lần/ngày và chỉ trong khung 5h - 10h
-      resetCopyCountFromDanhsach();
-
-      alert("Chào ngày mới");
-      localStorage.setItem("lastGreetingDate", today);
-    }
   });
 
   // ////// ////   // // //////////////////
@@ -93,11 +161,18 @@
   // Hàm xử lý khi click vào một item
   async function handleCopy(id: string, content: string): Promise<void> {
     // Giả lập hành động copy vào clipboard
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(content);
-      console.log(`Đã sao chép nội dung của item ${id}`);
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(content);
+      alert("Đã copy ✅");
     } else {
-      alert("Clipboard API không được hỗ trợ trên trình duyệt này.");
+      // fallback
+      const textarea = document.createElement("textarea");
+      textarea.value = content;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      alert("Đã copy (fallback) ✅");
     }
 
     await increaseCopyCount(id);
@@ -131,8 +206,11 @@
                 class="flex-1 pr-3 min-w-0"
                 on:click={() => toggleExpand(item.id)}
               >
+                <!-- <pre>
+                <code>{item.img}</code>
+              </pre> -->
                 <h2 class="text-lg font-semibold text-gray-800 truncate">
-                  {item["vị trí"]} - hi {item.id}
+                  {item.address}
                 </h2>
                 <p class="text-gray-600 text-sm truncate">
                   Giá: {item.price} tỷ VNĐ
@@ -140,16 +218,20 @@
               </div>
 
               <!-- Bên phải: Các nút điều khiển theo 2 hàng -->
-              <div class="flex flex-col items-end space-y-1">
+              <div class="grid grid-cols-[auto_auto] gap-1">
                 <!-- Hàng trên: Nút sao chép với số lần copy -->
+                <div class="flex justify-self-end">
+                  <button
+                    on:click={() => downloadAll(item.img)}
+                    class="pace-x-1 px-1 py-2 bg-blue-300 hover:bg-blue-600 text-white rounded text-sm transition-colors duration-200"
+                  >
+                    Tải ảnh
+                  </button>
+                </div>
                 <div class="flex items-center">
-                  <span class="text-sm text-gray-500 font-medium min-w-[20px]">
-                    <!-- Firebase -->
-                    {$copyCounts[item["id"]] ?? "..."}
-                  </span>
                   <button
                     on:click={() => handleCopy(item.id, item.detail)}
-                    class="flex items-center space-x-1 px-3 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors duration-200"
+                    class="flex items-center space-x-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors duration-200"
                   >
                     <!-- Copy Icon -->
                     <svg
@@ -166,7 +248,7 @@
                         d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
                       ></path>
                     </svg>
-                    <span>Copy</span>
+                    <span>Copy {$copyCounts[item.id] ?? "..."}</span>
                   </button>
                 </div>
               </div>

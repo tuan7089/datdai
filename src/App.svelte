@@ -2,7 +2,6 @@
   import { currentPath } from './lib/router';
   import { derived } from 'svelte/store';
   import DatList from './routes/DatList.svelte';
-  // import KhachList from './routes/KhachList.svelte';
   import CaiDat from './routes/CaiDat.svelte';
   import Nav from './components/Nav.svelte';
 
